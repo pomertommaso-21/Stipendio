@@ -86,6 +86,25 @@ svg.i.s{width:16px;height:16px;stroke-width:1.9}
 .h-stats span{font-size:17px;font-weight:500;letter-spacing:-.02em}
 .h-stats span.neg{color:var(--hero-crit)}
 
+.offer{display:grid;grid-template-columns:36px minmax(0,1fr);gap:14px;align-items:start;background:var(--spend-bg);border-radius:22px;padding:16px;animation:drop .3s ease}
+.o-ic{width:36px;height:36px;border-radius:12px;background:var(--spend);color:var(--surface);display:grid;place-items:center}
+.o-tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.o-tx b{font-size:15.5px;font-weight:600}
+.o-tx span{font-size:13.5px;color:var(--ink2);text-wrap:pretty}
+.o-act{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.xlist{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.xrow{display:grid;grid-template-columns:minmax(0,1fr) auto 34px;gap:12px;align-items:center;min-height:56px;border-bottom:1px solid var(--line);font-size:15px}
+.xn{display:flex;flex-direction:column;min-width:0}
+.xn small{font-size:12.5px;color:var(--muted)}
+.xa{font-weight:500;color:var(--spend);text-align:right}
+.x{border:0;background:none;color:var(--muted);width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+.x:hover{background:var(--sunk);color:var(--ink)}
+.x.arm{background:var(--crit);color:#fff;width:auto;padding:0 10px;font-size:12.5px;font-weight:600;justify-self:end}
+.mcard{border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.mhead{display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:500}
+.switch{width:48px;height:30px;border-radius:99px;border:0;background:var(--line);position:relative;flex:none;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgb(0 0 0/.2);transition:left .2s}
+.switch[aria-pressed="true"]{background:var(--spend)} .switch[aria-pressed="true"]::after{left:21px}
 /* blocco mese */
 .month{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:2px 18px 16px;display:flex;flex-direction:column}
 .stoggle{display:grid;grid-template-columns:minmax(0,1fr) auto 16px;gap:10px;align-items:center;min-height:58px;border:0;border-bottom:1px solid var(--hair);background:none;width:100%;text-align:left;padding:6px 0}
@@ -444,13 +463,13 @@ function example(cycle=10){
   const spese = [];
   for (let k = 1; k < pr.dayIndex; k++){ const [n,v] = names[k % names.length]; spese.push({id:uid(), name:n, amount:v, date:ago(k), ts:100-k}); }
   spese.push({id:uid(), name:'Caffè', amount:2, date:TODAY, ts:200});
-  return {v:3, example:true, salary:1850, payday:27, cycle, trackFrom:pr.startISO, trackExact:true, banks:[b1,b2,b3],
+  return {v:3, example:true, salary:1850, payday:27, cycle, trackFrom:pr.startISO, trackExact:true, carries:{[pr.startISO]:{amount:38}}, carryNo:[], banks:[b1,b2,b3],
     extras:[{id:uid(),name:'Paghetta',amount:50,date:pr.dayIndex>3?ago(2):TODAY,ts:150}], spese,
     goals:[{id:uid(),name:'Auto nuova',color:3,target:8000,saved:1500,deadline:ymAhead(18),banks:[b2.id,b3.id]}]};
 }
 const okDay = x => x && /^\d{4}-\d{2}-\d{2}$/.test(x.date);
 function normalize(s){
-  if(!s || !Array.isArray(s.banks)) return example();
+  if(!s || !Array.isArray(s.banks)) s = example();
   if ((s.v||1) < 2){
     s.banks.forEach(b=>{ b.mode='fixed'; b.value=+b.amount||0; b.kind=b.kind||'corrente'; delete b.amount;
       (b.cats||[]).forEach(c=>{ c.mode='fixed'; c.value=+c.amount||0; delete c.amount; }); });
@@ -459,6 +478,13 @@ function normalize(s){
   s.salary = +s.salary||0; s.payday = Math.min(31,Math.max(1,+s.payday||27)); s.cycle = Math.min(28,Math.max(1,+s.cycle||10));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s.trackFrom||'')){ s.trackFrom = TODAY; s._dirty = true; }
   s.trackExact = !!s.trackExact;
+  s.carries = s.carries && typeof s.carries === 'object' && !Array.isArray(s.carries) ? s.carries : {};
+  s.carryNo = Array.isArray(s.carryNo) ? s.carryNo : [];
+  // tredicesima e quattordicesima: importo e data scelti in Opzioni, si ripetono ogni anno nello stesso giorno
+  const yr = now.getFullYear(), md = {'13':'-12-15','14':'-07-01'};
+  s.mens = s.mens && typeof s.mens==='object' ? s.mens : {};
+  ['13','14'].forEach(k=>{ const m = s.mens[k] || {}; s.mens[k] = {on:!!m.on, amount: +m.amount || 0, date: /^\d{4}-\d{2}-\d{2}$/.test(m.date||'') ? m.date : yr+md[k]}; });
+  delete s.bonus;
   s.extras = Array.isArray(s.extras) ? s.extras.filter(okDay).map(x=>({...x, amount:+x.amount||0})) : [];
   s.spese = Array.isArray(s.spese) ? s.spese.filter(okDay).map(x=>({...x, amount:+x.amount||0})) : [];
   s.goals = Array.isArray(s.goals)?s.goals:[];
@@ -506,6 +532,13 @@ function startOnOrAfter(iso, cycle){
   let c = at(d.getFullYear(), d.getMonth()); if (isoDay(c) < iso) c = at(d.getFullYear(), d.getMonth()+1);
   return isoDay(c);
 }
+// prossima data (oggi compreso) di una mensilità che si ripete ogni anno; se il periodo in corso la contiene già, quella
+function nextMens(iso){
+  const p = periodOf(state.cycle), md = iso.slice(4);
+  for (const y of [now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1]){ const d = y+md; if (d>=iso && d>=p.startISO) return d; }
+  return iso;
+}
+const fmtDay = iso => new Intl.DateTimeFormat('it-IT',{day:'numeric',month:'long',year:'numeric'}).format(new Date(iso+'T12:00'));
 function nextPay(){
   const d = state.payday, y = now.getFullYear(), m = now.getMonth();
   const clamp = (yy,mm) => Math.min(d, new Date(yy,mm+1,0).getDate());
@@ -520,7 +553,7 @@ let state;
 try {
   const raw = localStorage.getItem(KEY) || localStorage.getItem(OLDKEY);
   state = normalize(raw ? JSON.parse(raw) : null);
-} catch(e){ state = example(); }
+} catch(e){ state = normalize(example()); }
 const persistIfNew = () => { if (state._dirty){ delete state._dirty; save(); } };
 const ui = { tab:'movimenti', armed:null, sheet:null, draft:{}, srcOpen:false, open:new Set() };
 try {
@@ -568,8 +601,20 @@ async function initStore(){
 // Un conto con voci vale la somma delle sue voci. Voci e conti senza voci possono essere
 // un importo fisso, una % del netto o "Resto", che si divide quello che avanza dello stipendio.
 let Q;
-function compute(){
-  const S = state.salary, bank = new Map(), cat = new Map();
+// tredicesima/quattordicesima che cadono in un periodo (dalla data scelta in poi, ogni anno)
+function mensIn(p){
+  const items = [];
+  ['13','14'].forEach(k=>{
+    const m = state.mens[k]; if (!m.on || !(m.amount>0)) return;
+    [...new Set([p.startISO.slice(0,4), p.endISO.slice(0,4)])].forEach(y=>{
+      const iso = y + m.date.slice(4);
+      if (iso>=p.startISO && iso<p.endISO && iso>=m.date) items.push({k, amount:m.amount, date:iso});
+    });
+  });
+  return {amount: sum(items, x=>x.amount), items};
+}
+function allocate(S){
+  const bank = new Map(), cat = new Map();
   let used = 0; const restB = [], restC = [];
   state.banks.forEach(b=>{
     if (b.cats.length){
@@ -585,33 +630,57 @@ function compute(){
   const n = restB.length + restC.length, share = n ? Math.max(0, S-used)/n : 0;
   restB.forEach(b=>bank.set(b.id, share)); restC.forEach(c=>cat.set(c.id, share));
   state.banks.forEach(b=>{ if (b.cats.length) bank.set(b.id, sum(b.cats, c=>cat.get(c.id)||0)); });
-  const alloc = sum([...bank.values()]);
-  // contanti e spese del periodo
-  const pr = periodOf(state.cycle), inP = x => x.date>=pr.startISO && x.date<pr.endISO;
+  return {bank, cat, alloc: sum([...bank.values()]), hasRest: n>0};
+}
+function compute(){
+  // la mensilità aggiuntiva si somma allo stipendio del periodo in cui arriva: le voci in % si calcolano anche su di essa
+  const pr = periodOf(state.cycle), mens = mensIn(pr), Sal = state.salary, S = Sal + mens.amount;
+  const {bank, cat, alloc, hasRest} = allocate(S);
+  const inP = x => x.date>=pr.startISO && x.date<pr.endISO;
   const extras = state.extras.filter(inP), spese = state.spese.filter(inP);
-  const extra = sum(extras, x=>x.amount), total = S + extra, free = total - alloc;
-  const daily = free>0 ? free/pr.days : 0;
+  const extra = sum(extras, x=>x.amount);
   // Il conteggio parte dall'inizio del primo periodo pieno (il giorno "cycle") da quando usi l'app,
   // a meno che tu non abbia scelto "da oggi". Prima di allora l'app mostra solo l'anteprima.
   const startTrack = state.trackExact ? state.trackFrom : startOnOrAfter(state.trackFrom, state.cycle);
   const pending = startTrack > TODAY;
   const eff = pending ? startTrack : (startTrack > pr.startISO ? startTrack : pr.startISO);
+  const dd = (a,b) => Math.round((new Date(b+'T12:00') - new Date(a+'T12:00'))/864e5);
+  // avanzo del periodo precedente: si può aggiungere al budget di questo periodo
+  const carryIn = !pending && state.carries[pr.startISO] ? state.carries[pr.startISO].amount : 0;
+  const total = S + extra + carryIn, free = total - alloc;
+  const daily = free>0 ? free/pr.days : 0;
+  let prev = null;
+  if (!pending){
+    const ref = new Date(pr.startISO+'T12:00'); ref.setDate(ref.getDate()-1);
+    const pp = periodOf(state.cycle, ref);
+    if (startTrack < pp.endISO){
+      const pIn = x => x.date>=pp.startISO && x.date<pp.endISO;
+      const pS = Sal + mensIn(pp).amount;
+      const pFree = pS + sum(state.extras.filter(pIn), x=>x.amount) + (state.carries[pp.startISO]?.amount||0) - allocate(pS).alloc;
+      const pEff = startTrack > pp.startISO ? startTrack : pp.startISO;
+      const pSpent = sum(state.spese.filter(x=>pIn(x) && x.date>=pEff), x=>x.amount);
+      const left = Math.floor((pFree>0 ? pFree/pp.days : 0) * dd(pEff, pp.endISO) - pSpent);
+      if (left > 0) prev = {amount:left, from:pp.from, to:pp.to, applied: !!state.carries[pr.startISO], declined: state.carryNo.includes(pr.startISO)};
+    }
+  }
   const counted = pending ? [] : spese.filter(x=>x.date>=eff);
   const spent = sum(counted, x=>x.amount), spentToday = sum(counted.filter(x=>x.date===TODAY), x=>x.amount);
   let next = null;
   if (pending){
     const np = periodOf(state.cycle, new Date(startTrack+'T12:00'));
-    const nFree = S + sum(state.extras.filter(x=>x.date>=np.startISO && x.date<np.endISO), x=>x.amount) - alloc;
+    const nIn = x => x.date>=np.startISO && x.date<np.endISO;
+    const nS = Sal + mensIn(np).amount;
+    const nFree = nS + sum(state.extras.filter(nIn), x=>x.amount) - allocate(nS).alloc;
     next = {...np, free:nFree, daily: nFree>0 ? nFree/np.days : 0, inDays: Math.round((new Date(startTrack+'T12:00') - new Date(TODAY+'T12:00'))/864e5)};
   }
-  const dd = (a,b) => Math.round((new Date(b+'T12:00') - new Date(a+'T12:00'))/864e5);
   const trackDays = Math.max(1, dd(eff, pr.endISO)), elapsed = Math.min(trackDays, dd(eff, TODAY)+1);
   const budget = daily*trackDays;
   const avail = daily*elapsed - spent;               // oggi: quota del giorno + avanzi (o meno gli sforamenti) dei giorni contati
   const carry = avail - (daily - spentToday);
   const effFrom = new Intl.DateTimeFormat('it-IT',{day:'numeric',month:'long'}).format(new Date(eff+'T12:00'));
-  return {bank, cat, alloc, free, hasRest: n>0, extra, extras, total, period: pr, spese, spent, spentToday, daily, avail, carry,
-    budget, left: budget - spent, trackDays, elapsed, partial: !pending && eff > pr.startISO, effFrom, pending, next, startTrack};
+  return {bank, cat, alloc, free, hasRest, extra, extras, total, period: pr, spese, spent, spentToday, daily, avail, carry,
+    budget, left: budget - spent, trackDays, elapsed, partial: !pending && eff > pr.startISO, effFrom, pending, next, startTrack, carryIn, prev, mens, salary: Sal,
+    offer: prev && !prev.applied && !prev.declined ? prev : null};
 }
 const B = id => state.banks.find(b=>b.id===id);
 const G = id => state.goals.find(g=>g.id===id);
@@ -686,6 +755,8 @@ function heroHTML(){
   </section>`;
 }
 
+const MENS_NAME = {'13':'Tredicesima','14':'Quattordicesima'};
+function mensLabel(){ const ks = [...new Set(Q.mens.items.map(x=>x.k))]; return ks.length===1 ? MENS_NAME[ks[0]].toLowerCase() : 'mensilità'; }
 function monthHTML(){
   const S = state.salary, free = Q.free, open = ui.srcOpen, nx = Q.extras.length;
   const live = state.banks.filter(b=>(Q.bank.get(b.id)||0)>0.004);
@@ -693,14 +764,18 @@ function monthHTML(){
     + (free>0.5 ? `<i class="fr" style="flex:${free}" title="Budget spendibile: ${eur.format(free)}"></i>` : '');
   return `<section class="month ${open?'open':''}">
     <button class="stoggle" data-a="srctoggle" aria-expanded="${open}">
-      <span class="sl"><span>Totale del mese</span>${open?'':`<small>Stipendio ${eur.format(S)}${Q.extra>0?` <em>+ ${eur.format(Q.extra)} contanti</em>`:''}</small>`}</span>
+      <span class="sl"><span>Totale del mese</span>${open?'':`<small>Stipendio ${eur.format(state.salary)}${Q.extra>0?` <em>+ ${eur.format(Q.extra)} contanti</em>`:''}${Q.carryIn>0?` <em>+ ${eur.format(Q.carryIn)} avanzo</em>`:''}${Q.mens.amount>0?` <em>+ ${eur.format(Q.mens.amount)} ${mensLabel()}</em>`:''}</small>`}</span>
       <span class="ssum">${eur.format(Q.total)}</span><span class="schev">${ui_('chev','i s')}</span>
     </button>
     ${open ? `<div class="srows">
       <label class="srow" for="in-salary"><span>Stipendio netto</span>
-        <span class="sval"><input id="in-salary" data-k="salary" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="${num.format(S)}" aria-label="Stipendio netto in euro"><span>€</span></span></label>
+        <span class="sval"><input id="in-salary" data-k="salary" inputmode="decimal" autocomplete="off" enterkeyhint="done" value="${num.format(state.salary)}" aria-label="Stipendio netto in euro"><span>€</span></span></label>
+      ${Q.mens.items.map(x=>`<button class="srow" data-a="settings"><span>${MENS_NAME[x.k]}</span><span class="sval cash">+ ${eur.format(x.amount)}</span></button>`).join('')}
       <button class="srow" data-a="quick" data-k="cash"><span>Da contanti${nx?` · ${nx} ${nx===1?'entrata':'entrate'}`:''}</span>
         ${Q.extra>0 ? `<span class="sval cash">+ ${eur.format(Q.extra)}</span>` : `<span class="sadd">${ui_('plus','i s')}Aggiungi</span>`}</button>
+      ${Q.carryIn>0 || Q.prev ? `<button class="srow" data-a="carry-row"><span>Avanzo del mese scorso</span>
+        ${Q.carryIn>0 ? (ui.armed==='carry' ? `<span class="sadd" style="color:var(--crit)">Tocca di nuovo per togliere</span>` : `<span class="sval cash">+ ${eur.format(Q.carryIn)}</span>`)
+          : `<span class="sadd">${ui_('plus','i s')}Aggiungi ${eur.format(Q.prev.amount)}</span>`}</button>` : ''}
     </div>` : ''}
     <div class="mrow"><span>Assegnato ai conti</span><b>${eur.format(Q.alloc)}</b></div>
     <div class="mrow sp ${free<-0.5?'neg':''}"><span>Budget spendibile</span><b>${money(free)}</b></div>
@@ -710,9 +785,19 @@ function monthHTML(){
   </section>`;
 }
 
+function offerHTML(){
+  const o = Q.offer; if (!o) return '';
+  return `<section class="offer">
+    <span class="o-ic">${ui_('plus','i s')}</span>
+    <div class="o-tx"><b>Ti sono avanzati ${eur.format(o.amount)}</b>
+      <span>dal periodo ${o.from} – ${o.to}. Vuoi aggiungerli al budget di questo mese?</span>
+      <div class="o-act"><button class="btn sm" data-a="carry-add">Aggiungi ${eur.format(o.amount)}</button><button class="btn2 sm" data-a="carry-no">No, grazie</button></div>
+    </div>
+  </section>`;
+}
 function summaryHTML(){
   return `<div class="brandrow"><span class="wordmark">${MARK}Quote</span><button class="iconbtn" data-a="settings" aria-label="Opzioni">${ui_('opzioni')}</button></div>
-    ${heroHTML()}${monthHTML()}`;
+    ${offerHTML()}${heroHTML()}${monthHTML()}`;
 }
 function miniHTML(){
   if (Q.pending && Q.next && Q.next.free > 0.5) return `<div class="mini-in"><div><small>Dal ${Q.next.from}</small><b>${eur.format(Math.floor(Q.next.daily))} al giorno</b></div><div class="r"><small>Budget del periodo</small><b>${eur.format(Q.next.free)}</b></div></div>`;
@@ -724,7 +809,9 @@ function miniHTML(){
 /* ---------- movimenti ---------- */
 function movesHTML(){
   const pr = Q.period;
-  const items = [...Q.spese.map(x=>({...x,k:'spesa'})), ...Q.extras.map(x=>({...x,k:'cash'}))]
+  const items = [...Q.spese.map(x=>({...x,k:'spesa'})), ...Q.extras.map(x=>({...x,k:'cash'})),
+    ...Q.mens.items.map(x=>({id:'m'+x.k, k:'mens', kind:x.k, name:MENS_NAME[x.k], amount:x.amount, date:x.date, ts:-2})),
+    ...(Q.carryIn>0 ? [{id:'carry', k:'carry', name:'Avanzo del mese scorso', amount:Q.carryIn, date:pr.startISO, ts:-1}] : [])]
     .sort((a,b)=> b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0));
   const head = Q.pending ? `<p class="period">Il conteggio delle spese parte il <b>${Q.next?.from||''}</b>. Quello che registri prima resta qui, ma non incide sul budget.</p>`
     : `<p class="period">Dal ${pr.from} al ${pr.to} · spesi <b>${eur.format(Q.spent)}</b>${Q.free>0.5?` su ${eur.format(Math.round(Q.budget))}`:''}</p>`;
@@ -738,7 +825,9 @@ function movesHTML(){
     const out = sum(g.items.filter(x=>x.k==='spesa'), x=>x.amount);
     const nsp = g.items.filter(x=>x.k==='spesa').length;
     return `<div class="dgroup"><div class="dayh"><span>${lbl.charAt(0).toUpperCase()+lbl.slice(1)}</span>${out>0&&nsp>1?`<b>−${eur.format(out)}</b>`:''}</div>
-      ${g.items.map(x=>`<button class="mv" data-a="edit-move" data-k="${x.k}" data-x="${x.id}">
+      ${g.items.map(x=> x.k==='mens' ? `<button class="mv" data-a="settings"><span class="mvi cash">${x.kind}ª</span>
+        <span class="mvn"><span>${esc(x.name)}</span><small>Insieme allo stipendio</small></span><span class="mva cash">+ ${eur.format(x.amount)}</span></button>` : x.k==='carry' ? `<div class="mv"><span class="mvi cash">${ui_('plus','i s')}</span>
+        <span class="mvn"><span>${esc(x.name)}</span><small>Aggiunto al budget</small></span><span class="mva cash">+ ${eur.format(x.amount)}</span></div>` : `<button class="mv" data-a="edit-move" data-k="${x.k}" data-x="${x.id}">
         <span class="mvi ${x.k}">${x.k==='cash'?'+':esc((x.name||'S').trim().charAt(0).toUpperCase())}</span>
         <span class="mvn"><span>${esc(x.name||(x.k==='cash'?'Contanti':'Spesa'))}</span>${x.k==='cash'?'<small>Contanti</small>':''}</span>
         <span class="mva ${x.k}">${x.k==='cash'?'+ ':'−'}${eur.format(x.amount)}</span></button>`).join('')}
@@ -935,6 +1024,18 @@ function settingsSheet(){
     ${Q.pending ? `<div class="f"><span class="fl">Inizio del conteggio</span>
       <p class="hint">Le spese si contano dal <b>${Q.next?.from}</b>, primo giorno del nuovo periodo.</p>
       <div class="order"><button class="btn2 sm" data-a="track-now">Inizia da oggi</button></div></div>` : ''}
+    <div class="f"><span class="fl">Tredicesima e quattordicesima</span>
+      ${['13','14'].map(k=>{ const m = state.mens[k], pdm = periodOf(state.cycle, new Date(nextMens(m.date)+'T12:00'));
+        return `<div class="mcard">
+          <div class="mhead"><span>${MENS_NAME[k]}</span><button class="switch" data-a="mtoggle" data-v="${k}" aria-pressed="${m.on}" aria-label="${m.on?'Disattiva':'Attiva'} ${MENS_NAME[k].toLowerCase()}"></button></div>
+          ${m.on ? `<div class="fgrid">
+            <div class="f"><label for="ms-a-${k}">Importo netto</label>${amtIn('ms-a-'+k,'mens.amount',m.amount,`data-m="${k}"`,'€','sm')}</div>
+            <div class="f"><label for="ms-d-${k}">Data</label><input class="in" type="date" id="ms-d-${k}" data-k="mens.date" data-m="${k}" value="${esc(m.date)}"></div>
+          </div>
+          <p class="hint">${(()=>{ const o = nextMens(m.date);
+            return o<=TODAY ? `Aggiunta allo stipendio di questo periodo (${fmtDay(o)}).` : o<Q.period.endISO ? `Arriva il ${fmtDay(o)}: si aggiunge allo stipendio di questo periodo.` : `Arriva il ${fmtDay(o)}: si aggiunge allo stipendio del periodo dal ${pdm.from} al ${pdm.to}.`; })()} Si ripete ogni anno nella stessa data.</p>` : ''}
+        </div>`; }).join('')}
+      <p class="hint">Si sommano allo stipendio del periodo in cui arrivano: anche le voci in percentuale si calcolano su di esse, il resto va nel budget spendibile. Puoi scegliere anche una data passata.</p></div>
     <div class="f"><label for="payday">Giorno di accredito dello stipendio</label>
       <select class="in" id="payday" data-k="payday">${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${state.payday===i+1?'selected':''}>Il ${i+1} del mese</option>`).join('')}</select>
       <p class="hint">${nextPay()}.</p></div>
@@ -1004,13 +1105,15 @@ function onInput(e){
   const b = el.dataset.b && B(el.dataset.b);
   const c = b && el.dataset.c && b.cats.find(x=>x.id===el.dataset.c);
   const g = el.dataset.g && G(el.dataset.g);
-  const isNum = /value|salary|target|saved/.test(k);
+  const isNum = /value|salary|target|saved|amount/.test(k);
   const v = isNum ? parseNum(el.value) : el.value;
   if (isNum && v===null) return;
   switch(k){
     case 'salary': state.salary=v; break;
     case 'payday': state.payday=+v; break;
     case 'cycle': state.cycle=+v; break;
+    case 'mens.amount': state.mens[el.dataset.m].amount = v; break;
+    case 'mens.date': if (/^\d{4}-\d{2}-\d{2}$/.test(v)) state.mens[el.dataset.m].date = v; break;
     case 'bank.name': b.name=v; break;
     case 'bank.value': b.value=v; break;
     case 'cat.name': c.name=v; break;
@@ -1024,7 +1127,7 @@ function onInput(e){
 }
 function onBlur(e){
   const el = e.target;
-  if (el.dataset?.k && /value|salary|target|saved/.test(el.dataset.k)){
+  if (el.dataset?.k && /value|salary|target|saved|amount/.test(el.dataset.k)){
     const v = parseNum(el.value);
     if (v!==null) el.value = el.parentElement.querySelector('span')?.textContent==='%' ? pnum.format(v) : num.format(v);
     sizeInputs();
@@ -1068,17 +1171,30 @@ function onClick(e){
       if (d.k==='cash') state.extras = state.extras.filter(x=>x.id!==d.id); else state.spese = state.spese.filter(x=>x.id!==d.id);
       ui.armed=null; ui.sheet=null; touch(); toast('Movimento eliminato.'); break; }
     case 'track-now': state.trackFrom = TODAY; state.trackExact = true; touch(); toast('Il conteggio parte da oggi.'); break;
+    case 'mtoggle': { const m = state.mens[t.dataset.v]; m.on = !m.on; if (m.on && !m.amount) m.amount = state.salary; touch(); break; }
+    case 'carry-add': {
+      const a = Q.prev?.amount || 0; if (!a) break;
+      state.carries[Q.period.startISO] = {amount:a}; state.carryNo = state.carryNo.filter(x=>x!==Q.period.startISO);
+      touch(); toast(`Aggiunti ${eur.format(a)} al budget di questo mese.`); break; }
+    case 'carry-no': state.carryNo.push(Q.period.startISO); touch(); toast('Va bene. Puoi aggiungerli quando vuoi da «Totale del mese».'); break;
+    case 'carry-row':
+      if (Q.carryIn>0){
+        if (ui.armed!=='carry'){ arm('carry'); break; }
+        delete state.carries[Q.period.startISO]; if (!state.carryNo.includes(Q.period.startISO)) state.carryNo.push(Q.period.startISO);
+        ui.armed=null; touch(); toast('Avanzo tolto dal budget.');
+      } else if (Q.prev){ state.carries[Q.period.startISO] = {amount:Q.prev.amount}; state.carryNo = state.carryNo.filter(x=>x!==Q.period.startISO); touch(); toast(`Aggiunti ${eur.format(Q.prev.amount)} al budget di questo mese.`); }
+      break;
     case 'srctoggle': ui.srcOpen = !ui.srcOpen; try{ localStorage.setItem('quote-src', ui.srcOpen?'1':'0'); }catch(e){} break;
     case 'acct-toggle': setOpen(b.id, !ui.open.has(b.id)); break;
     case 'custom': openSheet({type:'bank', id:b.id}); return;
     case 'edit-cat': openSheet({type:'cat', id:t.dataset.c, bid:b.id}); return;
     case 'edit-goal': openSheet({type:'goal', id:g.id}); return;
     case 'clear':
-      state = {v:3, example:false, salary:0, payday:state.payday, cycle:state.cycle, trackFrom:TODAY, trackExact:false, extras:[], spese:[], banks:[{id:uid(),name:'Conto principale',kind:'corrente',color:1,mode:'fixed',value:0,cats:[]}], goals:[]};
+      state = normalize({v:3, example:false, salary:0, payday:state.payday, cycle:state.cycle, trackFrom:TODAY, trackExact:false, carries:{}, carryNo:[], extras:[], spese:[], banks:[{id:uid(),name:'Conto principale',kind:'corrente',color:1,mode:'fixed',value:0,cats:[]}], goals:[]});
       ui.srcOpen = true; save(); render(); setTimeout(()=>{ const el = document.getElementById('in-salary'); el?.focus(); el?.select(); },0); toast('Pagina pulita. Inizia dal tuo stipendio.'); return;
     case 'reset':
       if (ui.armed!=='reset'){ arm('reset'); break; }
-      state = {v:3, example:false, salary:0, payday:27, cycle:10, trackFrom:TODAY, trackExact:false, extras:[], spese:[], banks:[], goals:[]}; ui.armed=null; ui.sheet=null; save(); toast('Dati cancellati.'); break;
+      state = normalize({v:3, example:false, salary:0, payday:27, cycle:10, trackFrom:TODAY, trackExact:false, carries:{}, carryNo:[], extras:[], spese:[], banks:[], goals:[]}); ui.armed=null; ui.sheet=null; save(); toast('Dati cancellati.'); break;
     case 'tpl': {
       if (ui.armed!=='t'+t.dataset.v){ arm('t'+t.dataset.v); break; }
       const tp = TEMPLATES.find(x=>x.id===t.dataset.v);
@@ -1180,7 +1296,6 @@ persistIfNew();
 initStore();
 })();
 </script>
-
 <script>
 // salva l'app sul dispositivo per usarla anche senza connessione
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));

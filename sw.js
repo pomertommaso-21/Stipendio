@@ -1,6 +1,6 @@
 // Quote: funzionamento offline.
 // La pagina si scarica dalla rete quando c'è connessione (così ricevi gli aggiornamenti) e dalla copia salvata quando non c'è.
-const CACHE = 'quote-v1';
+const CACHE = 'quote-v3';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
