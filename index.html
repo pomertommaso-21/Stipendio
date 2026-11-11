@@ -679,10 +679,13 @@ function compute(){
   }
   const trackDays = Math.max(1, dd(eff, pr.endISO)), elapsed = Math.min(trackDays, dd(eff, TODAY)+1);
   const budget = daily*trackDays;
-  const avail = daily*elapsed - spent;               // oggi: quota del giorno + avanzi (o meno gli sforamenti) dei giorni contati
-  const carry = avail - (daily - spentToday);
+  // Ogni giorno la quota si ricalcola: quello che resta del budget (prima delle spese di oggi) diviso per i giorni che mancano, oggi compreso.
+  const daysLeft = Math.max(1, trackDays - elapsed + 1);
+  const leftBefore = budget - (spent - spentToday);
+  const todayQuota = leftBefore / daysLeft;
+  const avail = todayQuota - spentToday;
   const effFrom = new Intl.DateTimeFormat('it-IT',{day:'numeric',month:'long'}).format(new Date(eff+'T12:00'));
-  return {bank, cat, alloc, free, hasRest, extra, extras, total, period: pr, spese, spent, spentToday, daily, avail, carry,
+  return {bank, cat, alloc, free, hasRest, extra, extras, total, period: pr, spese, spent, spentToday, daily, avail, todayQuota, daysLeft, leftBefore,
     budget, left: budget - spent, trackDays, elapsed, partial: !pending && eff > pr.startISO, effFrom, pending, next, startTrack, carryIn, prev, mens, salary: Sal,
     offer: prev && !prev.applied && !prev.declined ? prev : null};
 }
@@ -721,7 +724,7 @@ function heroHTML(){
     return `<section class="hero" id="hero">
       <div class="h-top"><span>Dal ${n.from} potrai spendere</span><span class="h-pill">${n.inDays===1?'Domani':`Tra ${n.inDays} giorni`}</span></div>
       <div class="h-val">${eur.format(Math.floor(n.daily)).replace(/\s*€/,'')}<small>€ al giorno</small></div>
-      <div class="h-sub">Periodo dal ${n.from} al ${n.to}. Da quel giorno la cifra si aggiorna con le tue spese: quello che non spendi passa al giorno dopo.</div>
+      <div class="h-sub">Periodo dal ${n.from} al ${n.to}. Da quel giorno la quota si ricalcola ogni giorno su quello che ti resta.</div>
       <div class="h-stats">
         <div><small>Budget</small><span>${eur.format(n.free)}</span></div>
         <div><small>Giorni</small><span>${n.days}</span></div>
@@ -739,11 +742,11 @@ function heroHTML(){
   }
   const v = todayVal(), neg = v < 0;
   let sub;
-  if (neg) sub = `Hai superato il ritmo di <b>${eur.format(-v)}</b>. Spendendo meno nei prossimi giorni torni in pari.`;
-  else if (Q.carry > 0.5) sub = `Quota di <b>${eur.format(Math.floor(Q.daily))}</b> al giorno più <b>${eur.format(Math.floor(Q.carry))}</b> avanzati nei giorni scorsi.`;
-  else if (Q.carry < -0.5) sub = `Quota di <b>${eur.format(Math.floor(Q.daily))}</b> al giorno meno <b>${eur.format(Math.ceil(-Q.carry))}</b> spesi in più nei giorni scorsi.`;
-  else sub = `Quota fissa di <b>${eur.format(Math.floor(Q.daily))}</b> al giorno.`;
-  if (!neg && Q.spentToday > 0) sub += ` Oggi hai già speso <b>${eur.format(Q.spentToday)}</b>.`;
+  const dl = Q.daysLeft, giorni = dl===1 ? 'l\'ultimo giorno' : `${dl} giorni`;
+  if (Q.leftBefore <= 0) sub = `Hai già usato tutto il budget del periodo.`;
+  else if (neg) sub = `Oggi hai superato la quota di <b>${eur.format(-v)}</b>. Da domani la quota si ricalcola più bassa.`;
+  else sub = `Restano <b>${eur.format(Math.floor(Q.leftBefore))}</b> per ${giorni}: <b>${eur.format(Math.floor(Q.todayQuota))} al giorno</b>.`
+    + (Q.spentToday > 0 ? ` Oggi hai già speso <b>${eur.format(Q.spentToday)}</b>.` : '');
   const spentPct = Q.budget>0 ? Math.min(100, Q.spent/Q.budget*100) : 0, dayPct = Q.elapsed/Q.trackDays*100;
   return `<section class="hero" id="hero">
     <div class="h-top"><span>Oggi puoi spendere</span><span class="h-pill">Giorno ${pr.dayIndex} di ${pr.days}</span></div>
@@ -1024,7 +1027,7 @@ function settingsSheet(){
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Opzioni">${head('Opzioni')}
     <div class="f"><label for="cycle">Mese di spesa</label>
       <select class="in" id="cycle" data-k="cycle">${Array.from({length:28},(_,i)=>`<option value="${i+1}" ${state.cycle===i+1?'selected':''}>${i===0?'Dal 1 alla fine del mese':`Dal ${i+1} al ${i} del mese dopo`}</option>`).join('')}</select>
-      <p class="hint">La quota al giorno è il budget spendibile diviso per i giorni di questo periodo, e resta fissa. Spese e contanti valgono per il periodo in cui li registri.</p></div>
+      <p class="hint">Ogni giorno la quota si ricalcola: quello che resta del budget diviso per i giorni che mancano, oggi compreso. Spese e contanti valgono per il periodo in cui li registri.</p></div>
     ${Q.pending ? `<div class="f"><span class="fl">Inizio del conteggio</span>
       <p class="hint">Le spese si contano dal <b>${Q.next?.from}</b>, primo giorno del nuovo periodo.</p>
       <div class="order"><button class="btn2 sm" data-a="track-now">Inizia da oggi</button></div></div>` : ''}
